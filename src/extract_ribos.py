@@ -35,20 +35,32 @@ def sum_tax(vect, level, clean = True):
     return (top, counts[top]/len(taxa))
 
 
-def process_fasta(fasta, specific = 0, threads=20):
+def process_fasta(fasta, specific = 0, threads=20, sub = "ibosomal"):
     if specific == 0:
         switch = 'normal'
     elif specific == 1:
         switch = 'more-sensitive'
     else :
         switch = 'very-sensitive'
-    file = fasta + "." + switch + ".uniref.diamond"
-    if not os.path.exists(file):
+
+    if sub != "":
+        SeqIO.write([s for s in SeqIO.parse(fasta, "fasta") if sub in s.description], "temp.fasta", "fasta")
+        run_fasta = "temp.fasta"
+    else :
+        sub = "full"
+        run_fasta = fasta
+
+    file = fasta + "." + sub + "." + switch + ".uniref.diamond"
+    if os.stat(run_fasta).st_size == 0:
+        return [('hit_rate', -1)]
+    if not os.path.exists(file + ".done"):
         print("running diamond")
-        os.system("diamond blastp --query {fasta} --db $DIAMOND_UNIREF90 --threads 20  --out {file} --outfmt 6 {switch} --threads {threads} > /dev/null".format(threads = threads, file = file, fasta = fasta , switch = ("--" + switch) if switch  != 'normal' else ""))
-    diamond = pandas.read_csv(file, sep="\t", header=None)
-    if len(diamond) == 0:
-        [('hit_rate', 0)]
+        os.system("diamond blastp --query {fasta} --db $DIAMOND_UNIREF90 --threads 20  --out {file} --outfmt 6 {switch} --threads {threads} 2> /dev/null > /dev/null".format(threads = threads, file = file, fasta = run_fasta , switch = ("--" + switch) if switch  != 'normal' else ""))
+        os.system("touch {file}.done".format(file = file))
+    if os.stat(file).st_size != 0:
+        diamond = pandas.read_csv(file, sep="\t", header=None)
+    else :
+        return [('hit_rate', 0)]
     diamond = diamond.loc[diamond[10] < 10**-10]
     best_hits = {f[0] : list(f[1].loc[f[1][2] == max(f[1][2])][1])[0] for f in diamond.groupby(0)}
     to_tax = set(best_hits.values())
@@ -56,6 +68,6 @@ def process_fasta(fasta, specific = 0, threads=20):
     uni_tax_map = {k : v for k, v in uni_tax_map.items() if v}
     tax_facts = [uni_tax_map[v] for k,v in best_hits.items() if uni_tax_map.get(v) ]
     bestclasses = [sum_tax(tax_facts, i) for i in range(14) ]
-    hit_rate = len(tax_facts)/sum([1 for s in SeqIO.parse(fasta,"fasta")])
-    print(bestclasses + [('hit_rate', hit_rate)])
+    hit_rate = len(tax_facts)/sum([1 for s in SeqIO.parse(run_fasta,"fasta")])
+    #print(bestclasses + [('hit_rate', hit_rate)])
     return bestclasses + [('hit_rate', hit_rate)]
