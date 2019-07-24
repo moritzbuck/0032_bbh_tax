@@ -67,7 +67,7 @@ def run_diamond(fasta, specific = 0, threads = 20, sub = "ibosomal"):
 
 def process_single_fasta(fasta, specific = 0, threads=20, sub = "ibosomal"):
     diamond = run_diamond(fasta, specific, threads, sub )
-    if len(diamond == 1):
+    if len(diamond) == 1:
         return diamond
 
     diamond = diamond.loc[diamond[10] < 10**-10]
@@ -85,7 +85,7 @@ def process_single_fasta(fasta, specific = 0, threads=20, sub = "ibosomal"):
 
 def process_composite_fasta(fasta, specific = 0, threads=20, sub = "ibosomal"):
     diamond = run_diamond(fasta, specific, threads, sub)
-    if len(diamond == 1):
+    if len(diamond) < 2:
         return diamond
 
     diamond = diamond.loc[diamond[10] < 10**-10]
